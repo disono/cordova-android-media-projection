@@ -326,7 +326,7 @@ public class MediaProjection extends AppCompatActivity {
      */
     private void _releaseActivity() {
         // at last call sendPluginResult
-        PluginResult result = new PluginResult(PluginResult.Status.OK);
+        PluginResult result = new PluginResult(PluginResult.Status.OK, recording_filename);
         // release status callback in JS side
         result.setKeepCallback(false);
         callbackContext.sendPluginResult(result);
