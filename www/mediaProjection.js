@@ -9,7 +9,7 @@ mediaProjection.start = function(success, failure) {
     exec(
         success,
         failure,
-        'MediaProjection',
+        'CordovaMediaProjection',
         'start',
         []
     );
@@ -20,7 +20,7 @@ mediaProjection.stop = function(success, failure) {
     exec(
         success,
         failure,
-        'MediaProjection',
+        'CordovaMediaProjection',
         'stop',
         []
     );

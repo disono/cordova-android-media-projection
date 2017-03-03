@@ -2,7 +2,7 @@
 <plugin xmlns="http://www.phonegap.com/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
         id="cordova-android-media-projection"
-        version="0.0.2">
+        version="0.0.3">
     <name>Cordova Media Projection</name>
     <description>Cordova Media Projection is to capture device screen in real time and show it on a Surface-View. .
         Available for Android ONLY.
@@ -14,15 +14,15 @@
         <engine name="cordova" version=">=3.0.0"/>
     </engines>
 
-    <js-module src="www/mediaProjection.js" name="MediaProjection">
+    <js-module src="www/mediaProjection.js" name="CordovaMediaProjection">
         <clobbers target="window.mediaProjection"/>
     </js-module>
 
     <!-- android -->
     <platform name="android">
         <config-file target="res/xml/config.xml" parent="/*">
-            <feature name="MediaProjection">
-                <param name="android-package" value="com.webmons.disono.mediaprojection.MediaProjection"/>
+            <feature name="CordovaMediaProjection">
+                <param name="android-package" value="com.webmons.disono.mediaprojection.CordovaMediaProjection"/>
             </feature>
         </config-file>
 
@@ -31,7 +31,7 @@
             <uses-permission android:name="android.permission.RECORD_AUDIO"/>
         </config-file>
 
-        <source-file src="src/com/webmons/disono/mediaprojection/MediaProjection.java"
+        <source-file src="src/com/webmons/disono/mediaprojection/CordovaMediaProjection.java"
                      target-dir="src/com/webmons/disono/mediaprojection"/>
 
         <framework src="com.android.support:appcompat-v7:25.2.0" />

@@ -12,25 +12,32 @@ import android.media.MediaRecorder;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
-import android.os.Bundle;
+import android.os.Build;
 import android.os.Environment;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.widget.Toast;
 
+import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.PluginResult;
+import org.json.JSONArray;
+import org.json.JSONException;
+
 import java.io.IOException;
 
-public class MediaProjection extends AppCompatActivity {
+import static android.app.Activity.RESULT_OK;
 
-    private static final String TAG = "MainActivity";
+public class CordovaMediaProjection extends CordovaPlugin {
+
+    private static final String TAG = "CordovaMediaProjection";
     private static final int REQUEST_CODE = 1000;
     private int mScreenDensity;
     private MediaProjectionManager mProjectionManager;
@@ -57,28 +64,26 @@ public class MediaProjection extends AppCompatActivity {
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
         activity = cordova.getActivity();
         this.callbackContext = callbackContext;
 
         if (action.equals("start")) {
-                    _startRecording();
+            _startRecording();
 
-                    // Don't return any result now
-                    PluginResult pluginResult = new PluginResult(PluginResult.Status.NO_RESULT);
-                    pluginResult.setKeepCallback(true);
-                    callbackContext.sendPluginResult(pluginResult);
+            // Don't return any result now
+            PluginResult pluginResult = new PluginResult(PluginResult.Status.NO_RESULT);
+            pluginResult.setKeepCallback(true);
+            callbackContext.sendPluginResult(pluginResult);
 
-                    return true;
-                } else if (action.equals("stop")) {
-                    _stopRecording();
+            return true;
+        } else if (action.equals("stop")) {
+            Toast.makeText(activity.getApplicationContext(), "Stop Recording...", Toast.LENGTH_SHORT).show();
+            _stopRecording();
 
-                    return true;
-                }
+            return true;
+        }
 
-                return false;
+        return false;
     }
 
     @Override
@@ -89,7 +94,7 @@ public class MediaProjection extends AppCompatActivity {
         }
 
         if (resultCode != RESULT_OK) {
-            Toast.makeText(this, "Screen Cast Permission Denied", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity.getApplicationContext(), "Screen Cast Permission Denied", Toast.LENGTH_SHORT).show();
             isRecording = false;
 
             return;
@@ -106,26 +111,27 @@ public class MediaProjection extends AppCompatActivity {
      * Start recording and capturing
      */
     private void _startRecording() {
-        if (ContextCompat.checkSelfPermission(MainActivity.this,
+        if (ContextCompat.checkSelfPermission(activity,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE) + ContextCompat
-                .checkSelfPermission(MainActivity.this,
+                .checkSelfPermission(activity,
                         Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
 
             if (ActivityCompat.shouldShowRequestPermissionRationale
-                    (MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ||
+                    (activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) ||
                     ActivityCompat.shouldShowRequestPermissionRationale
-                            (MainActivity.this, Manifest.permission.RECORD_AUDIO)) {
+                            (activity, Manifest.permission.RECORD_AUDIO)) {
 
                 AlertDialog.Builder builder = new AlertDialog.Builder(activity.getApplicationContext());
                 builder.setMessage("Requesting Permission")
                         .setPositiveButton("ENABLE", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int id) {
-                                ActivityCompat.requestPermissions(MainActivity.this,
-                                        new String[]{Manifest.permission
-                                                .WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO},
-                                        REQUEST_PERMISSIONS);
+                                cordova.getThreadPool().execute(new Runnable() {
+                                    public void run() {
+                                        requestPermissionAction(callbackContext);
+                                    }
+                                });
                             }
                         })
                         .setNegativeButton("No", new DialogInterface.OnClickListener() {
@@ -135,14 +141,35 @@ public class MediaProjection extends AppCompatActivity {
                             }
                         }).show();
             } else {
-                ActivityCompat.requestPermissions(MainActivity.this,
-                        new String[]{Manifest.permission
-                                .WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO},
-                        REQUEST_PERMISSIONS);
+                requestPermissionAction(callbackContext);
             }
         } else {
             onScreenShare(true);
         }
+    }
+
+    /**
+     * Request a permission
+     *
+     * @param callbackContext Cordova callback context
+     */
+    private void requestPermissionAction(CallbackContext callbackContext) {
+        String[] permissions = {
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.RECORD_AUDIO
+        };
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            Log.i(TAG, "This only applies to android M.");
+
+            ActivityCompat.requestPermissions(activity,
+                    new String[]{Manifest.permission
+                            .WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO},
+                    REQUEST_PERMISSIONS);
+            return;
+        }
+
+        cordova.requestPermissions(this, REQUEST_PERMISSIONS, permissions);
     }
 
     /**
@@ -158,7 +185,7 @@ public class MediaProjection extends AppCompatActivity {
      * @return VirtualDisplay
      */
     private VirtualDisplay createVirtualDisplay() {
-        return mMediaProjection.createVirtualDisplay("MainActivity",
+        return mMediaProjection.createVirtualDisplay("CordovaMediaProjection",
                 DISPLAY_WIDTH, DISPLAY_HEIGHT, mScreenDensity,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 mMediaRecorder.getSurface(), null /*Callbacks*/, null /*Handler*/);
@@ -186,7 +213,7 @@ public class MediaProjection extends AppCompatActivity {
      */
     private void shareScreen() {
         if (mMediaProjection == null) {
-            startActivityForResult(mProjectionManager.createScreenCaptureIntent(), REQUEST_CODE);
+            cordova.startActivityForResult(this, mProjectionManager.createScreenCaptureIntent(), REQUEST_CODE);
             return;
         }
 
@@ -199,11 +226,11 @@ public class MediaProjection extends AppCompatActivity {
      */
     private void initRecord() {
         DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
         mScreenDensity = metrics.densityDpi;
 
         mMediaRecorder = new MediaRecorder();
-        mProjectionManager = (MediaProjectionManager) getSystemService
+        mProjectionManager = (MediaProjectionManager) activity.getSystemService
                 (Context.MEDIA_PROJECTION_SERVICE);
 
         recording_filename = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/video-" + _unixEpoch() + ".mp4";
@@ -220,7 +247,7 @@ public class MediaProjection extends AppCompatActivity {
             mMediaRecorder.setVideoEncodingBitRate(512 * 1000);
             mMediaRecorder.setVideoFrameRate(30);
 
-            int rotation = getWindowManager().getDefaultDisplay().getRotation();
+            int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
             int orientation = ORIENTATIONS.get(rotation + 90);
             mMediaRecorder.setOrientationHint(orientation);
             mMediaRecorder.prepare();
@@ -254,9 +281,10 @@ public class MediaProjection extends AppCompatActivity {
             mMediaProjection = null;
         }
 
-        Log.i(TAG, "MediaProjection Stopped");
         isRecording = false;
         _releaseActivity();
+
+        Log.i(TAG, "MediaProjection Stopped");
     }
 
     /**
@@ -285,9 +313,10 @@ public class MediaProjection extends AppCompatActivity {
      * @param grantResults Did we grant
      */
     @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String permissions[],
-                                           @NonNull int[] grantResults) {
+    public void onRequestPermissionResult(int requestCode,
+                                          @NonNull String permissions[],
+                                          @NonNull int[] grantResults) {
+
         switch (requestCode) {
             case REQUEST_PERMISSIONS: {
                 if ((grantResults.length > 0) && (grantResults[0] +
@@ -295,7 +324,7 @@ public class MediaProjection extends AppCompatActivity {
                     // let's start to record the screen
                     onScreenShare(true);
                 } else {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(activity.getApplicationContext());
                     builder.setMessage("Requesting Permission")
                             .setPositiveButton("ENABLE", new DialogInterface.OnClickListener() {
                                 @Override
@@ -303,11 +332,11 @@ public class MediaProjection extends AppCompatActivity {
                                     Intent intent = new Intent();
                                     intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                                     intent.addCategory(Intent.CATEGORY_DEFAULT);
-                                    intent.setData(Uri.parse("package:" + getPackageName()));
+                                    intent.setData(Uri.parse("package:" + activity.getPackageName()));
                                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                     intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
                                     intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-                                    startActivity(intent);
+                                    activity.startActivity(intent);
                                 }
                             })
                             .setNegativeButton("No", new DialogInterface.OnClickListener() {
@@ -325,6 +354,8 @@ public class MediaProjection extends AppCompatActivity {
      * Release activity
      */
     private void _releaseActivity() {
+        Toast.makeText(activity.getApplicationContext(), "Saving video to (" + recording_filename + ")", Toast.LENGTH_SHORT).show();
+
         // at last call sendPluginResult
         PluginResult result = new PluginResult(PluginResult.Status.OK, recording_filename);
         // release status callback in JS side
